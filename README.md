@@ -1,1 +1,3 @@
-# lab_seven_updated
+# To Run the code:
+javac UserManagementSystem.java
+java UserManagementSystem
