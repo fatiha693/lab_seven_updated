@@ -1,3 +1,3 @@
 # To Run the code:
-'''javac UserManagementSystem.java'''
-'''java UserManagementSystem'''
+* javac UserManagementSystem.java
+* java UserManagementSystem
