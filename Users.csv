@@ -1,0 +1,3 @@
+Username,Email,Password,Type
+basic_user,basic@email.com,password123,basic
+power_user,power@email.com,password123,power
