@@ -1,9 +1,18 @@
 import java.io.*;
 import java.util.*;
 
-// Simple interfaces for different user types (ISP)
+
+interface FileReadable {
+    void readFromFile(String filename);
+}
+
+interface FileWriteable {
+    void writeToFile(String filename);
+}
+
+
 interface BasicUserActions {
-    List<String> viewUserList();  // Simplified to just return usernames
+    List<String> viewUserList();
 }
 
 interface PowerUserActions extends BasicUserActions {
@@ -15,12 +24,12 @@ interface AdminActions extends PowerUserActions {
     boolean updateSystem(String setting);
 }
 
-// Simple User class
-class User {
+
+class User implements FileReadable, FileWriteable {
     String username;
     String email;
     String password;
-    String type;  // "basic", "power", or "admin"
+    String type;
 
     User(String username, String email, String password, String type) {
         this.username = username;
@@ -28,29 +37,79 @@ class User {
         this.password = password;
         this.type = type;
     }
+
+    @Override
+    public void readFromFile(String filename) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(filename))) {
+            String line = reader.readLine(); // Skip header
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",");
+                if (parts[0].equals(this.username)) {
+                    this.email = parts[1];
+                    this.password = parts[2];
+                    this.type = parts.length > 3 ? parts[3] : "admin";
+                    break;
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("Error reading user data: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void writeToFile(String filename) {
+        try {
+            List<String> allLines = new ArrayList<>();
+            BufferedReader reader = new BufferedReader(new FileReader(filename));
+            String line;
+            boolean userFound = false;
+            
+            allLines.add(reader.readLine()); 
+            
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",");
+                if (parts[0].equals(this.username)) {
+                    allLines.add(String.format("%s,%s,%s,%s", username, email, password, type));
+                    userFound = true;
+                } else {
+                    allLines.add(line);
+                }
+            }
+            
+            if (!userFound) {
+                allLines.add(String.format("%s,%s,%s,%s", username, email, password, type));
+            }
+            
+            reader.close();
+
+            PrintWriter writer = new PrintWriter(new FileWriter(filename));
+            for (String userLine : allLines) {
+                writer.println(userLine);
+            }
+            writer.close();
+            
+        } catch (IOException e) {
+            System.out.println("Error writing user data: " + e.getMessage());
+        }
+    }
 }
 
-// Main system class using Singleton pattern
+// Main system class (Singleton)
 public class UserManagementSystem {
-    // Singleton instance
     private static UserManagementSystem onlyInstance;
     
-    // Lists to store users
     private ArrayList<User> normalUsers;
     private ArrayList<User> adminUsers;
-    
-    // File names
+
     private static final String USERS_FILE = "Users.csv";
     private static final String ADMIN_FILE = "Admin.csv";
 
-    // Private constructor (Singleton pattern)
     private UserManagementSystem() {
         normalUsers = new ArrayList<>();
         adminUsers = new ArrayList<>();
         loadUsersFromFiles();
     }
 
-    // Get the single instance (Singleton pattern)
     public static UserManagementSystem getInstance() {
         if (onlyInstance == null) {
             onlyInstance = new UserManagementSystem();
@@ -61,25 +120,51 @@ public class UserManagementSystem {
     // Load users from CSV files
     private void loadUsersFromFiles() {
         try {
+            // Create files if they don't exist
+            createFilesIfNotExist();
+
             // Load normal users
             BufferedReader reader = new BufferedReader(new FileReader(USERS_FILE));
-            String line = reader.readLine(); // Skip header
+            String line = reader.readLine(); 
             while ((line = reader.readLine()) != null) {
                 String[] parts = line.split(",");
-                normalUsers.add(new User(parts[0], parts[1], parts[2], parts[3]));
+                User user = new User(parts[0], parts[1], parts[2], parts[3]);
+                user.readFromFile(USERS_FILE);
+                normalUsers.add(user);
             }
             reader.close();
 
             // Load admin users
             reader = new BufferedReader(new FileReader(ADMIN_FILE));
-            line = reader.readLine(); // Skip header
+            line = reader.readLine(); 
             while ((line = reader.readLine()) != null) {
                 String[] parts = line.split(",");
-                adminUsers.add(new User(parts[0], parts[1], parts[2], "admin"));
+                User admin = new User(parts[0], parts[1], parts[2], "admin");
+                admin.readFromFile(ADMIN_FILE);
+                adminUsers.add(admin);
             }
             reader.close();
         } catch (IOException e) {
             System.out.println("Error reading files: " + e.getMessage());
+        }
+    }
+
+    private void createFilesIfNotExist() throws IOException {
+        File usersFile = new File(USERS_FILE);
+        if (!usersFile.exists()) {
+            PrintWriter writer = new PrintWriter(new FileWriter(USERS_FILE));
+            writer.println("Username,Email,Password,Type");
+            writer.println("basic_user,basic@test.com,password123,basic");
+            writer.println("power_user,power@test.com,password123,power");
+            writer.close();
+        }
+
+        File adminFile = new File(ADMIN_FILE);
+        if (!adminFile.exists()) {
+            PrintWriter writer = new PrintWriter(new FileWriter(ADMIN_FILE));
+            writer.println("Username,Email,Password");
+            writer.println("admin,admin@test.com,admin123");
+            writer.close();
         }
     }
 
@@ -116,7 +201,6 @@ public class UserManagementSystem {
         }
 
         public boolean addNewUser(String username, String email) {
-            // Check if username already exists
             for (User u : normalUsers) {
                 if (u.username.equals(username)) {
                     return false;
@@ -144,7 +228,6 @@ public class UserManagementSystem {
         }
 
         public boolean addNewUser(String username, String email) {
-            // Check if username already exists
             for (User u : normalUsers) {
                 if (u.username.equals(username)) {
                     return false;
@@ -167,7 +250,6 @@ public class UserManagementSystem {
         }
 
         public boolean updateSystem(String setting) {
-            // Simple implementation
             System.out.println("System setting updated: " + setting);
             return true;
         }
@@ -178,18 +260,17 @@ public class UserManagementSystem {
         try {
             PrintWriter writer = new PrintWriter(new FileWriter(USERS_FILE));
             writer.println("Username,Email,Password,Type");
-            for (User u : normalUsers) {
-                writer.println(u.username + "," + u.email + "," + u.password + "," + u.type);
-            }
             writer.close();
+
+            for (User u : normalUsers) {
+                u.writeToFile(USERS_FILE);
+            }
         } catch (IOException e) {
             System.out.println("Error saving to file: " + e.getMessage());
         }
     }
 
-    // Get appropriate user interface based on user type
     public Object getUserInterface(String username, String password) {
-        // Check normal users
         for (User u : normalUsers) {
             if (u.username.equals(username) && u.password.equals(password)) {
                 if (u.type.equals("basic")) {
@@ -200,7 +281,6 @@ public class UserManagementSystem {
             }
         }
         
-        // Check admin users
         for (User u : adminUsers) {
             if (u.username.equals(username) && u.password.equals(password)) {
                 return new AdminUser(u);
@@ -211,11 +291,8 @@ public class UserManagementSystem {
 
     // Main method to test the system
     public static void main(String[] args) {
-        // Get the system instance
         UserManagementSystem system = UserManagementSystem.getInstance();
-
-        // Test with different user types
-        System.out.println("Testing User Management System:");
+        System.out.println("Testing User Management System with File Operations:");
 
         // Test basic user
         Object userInterface = system.getUserInterface("basic_user", "password123");
